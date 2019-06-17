@@ -39,7 +39,7 @@ Is a form of expanded Shared Custody Ownership that requires consensus over the 
 
 **Arithmetic**: Integer overflows and underflows are not a new class of vulnerability, but they are especially dangerous in smart contracts, where unsigned integers are prevalent and most developers are used to simple int types (which are often just signed integers). If overflows occur, many benign-seeming codepaths become vectors for theft or denial of service.
 
-**Unchecked Low Level Calls**: One of the deeper features of Solidity are the low level functions call(), callcode(), delegatecall() and send(). Their behavior in accounting for errors is quite different from other Solidity functions, as they will not propagate (or bubble up) and will not lead to a total reversion of the current execution. Instead, they will return a boolean value set to false, and the code will continue to run. This could surprise developers and, if the return value of such low-level calls are not checked, it could lead to fail-opens and other unwanted outcomes
+**Unchecked Low Level Calls**: One of the deeper features of Solidity are the low level functions such as call(), callcode(), delegatecall() and send(). Their behavior in accounting for errors is quite different from other Solidity functions, as they will not propagate (or bubble up) and will not lead to a total reversion of the current execution. Instead, they will return a boolean value set to false, and the code will continue to run. This could surprise developers and, if the return value of such low-level calls are not checked, it could lead to fail-opens and other unwanted outcomes
  
 **Bad Randomness**: Is hard to get right in Ethereum. While Solidity offers functions and variables that can access apparently hard-to-predict values, they are generally either more public than they seem. Because randomness sources are to an extent predictable in ethereum, malicious users can generally replicate it and attack the function relying on its unpredictablility and this applies to dApps built on top of Quorum too.
 
@@ -66,7 +66,7 @@ Is a form of expanded Shared Custody Ownership that requires consensus over the 
 
 !!! success "Ownership relate events must be broadcasted to all the network participants."
 
-!!! success "Constortium based ownership change consensus pending state, must expire in a specific prefixed time frame (ownership expiration request date)."
+!!! success "In a Constortium based ownership structure changing activities that are bound to approval from Constortium members before they are commited (E.g editing Constortium structure) must have an aproval pending expiration date."
 
 !!! success "Constorium based voting must involve realtime notification through EVM event emition. "
 
