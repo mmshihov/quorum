@@ -66,7 +66,7 @@ Tessera contains functionality to request transactions from other nodes in the n
 However, depending on the size of the network and the number of transactions made between peers, this can put heavy strain on the network resending all the data.
 
 ### How to enable
-The data recovery mechanism is intended to be a "switch-on" feature as a startup command. The times when you will need this will be known prior to starting the application (usually after a disaster event). When starting Tessera, simply add the following property to the startup command: `-Dspring.profiles.active=enable-sync-poller`. This should go before any jar or class definitions, e.g. `java -Dspring.profiles.active=enable-sync-poller -jar tessera.jar -configfile config.json`.
+The data recovery mechanism is intended to be a "switch-on" feature as a startup command. The times when you will need this will be known prior to starting the application (usually after a disaster event). When starting Tessera, simply add the following property to the startup command: `-recover`. I.e. `java -jar tessera.jar -configfile config.json -recover`.
 
 ### How it works
 The data recovery procedure works by invoking a "resend request" to each new node it sees in the network. This request will cause the target node to resend each of its transactions to the intended recipient, meaning they will again save the transaction in their database.
