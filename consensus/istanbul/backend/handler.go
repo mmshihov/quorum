@@ -136,9 +136,12 @@ func (sb *backend) SetBroadcaster(broadcaster consensus.Broadcaster) {
 func (sb *backend) NewChainHead() error {
 	sb.coreMu.RLock()
 	defer sb.coreMu.RUnlock()
+
 	if !sb.coreStarted {
 		return istanbul.ErrStoppedEngine
 	}
+
 	go sb.istanbulEventMux.Post(istanbul.FinalCommittedEvent{})
+
 	return nil
 }

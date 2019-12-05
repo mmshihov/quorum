@@ -261,6 +261,7 @@ func (w *worker) pending() (*types.Block, *state.StateDB, *state.StateDB) {
 	// return a snapshot to avoid contention on currentMu mutex
 	w.snapshotMu.RLock()
 	defer w.snapshotMu.RUnlock()
+
 	if w.snapshotState == nil {
 		return nil, nil, nil
 	}
@@ -272,14 +273,17 @@ func (w *worker) pendingBlock() *types.Block {
 	// return a snapshot to avoid contention on currentMu mutex
 	w.snapshotMu.RLock()
 	defer w.snapshotMu.RUnlock()
+
 	return w.snapshotBlock
 }
 
 // start sets the running status as 1 and triggers new work submitting.
 func (w *worker) start() {
 	atomic.StoreInt32(&w.running, 1)
+
 	if istanbul, ok := w.engine.(consensus.Istanbul); ok {
 		istanbul.Start(w.chain, w.chain.CurrentBlock, w.chain.HasBadBlock)
+		// TODO: check the istanbul start(...) --- start consensus
 	}
 	w.startCh <- struct{}{}
 }
@@ -289,7 +293,8 @@ func (w *worker) stop() {
 	if istanbul, ok := w.engine.(consensus.Istanbul); ok {
 		istanbul.Stop()
 	}
-	atomic.StoreInt32(&w.running, 0)
+
+	atomic.StoreInt32(&w.running, 0) //REM: why it is enough?
 }
 
 // isRunning returns an indicator whether worker is running or not.
@@ -317,12 +322,15 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 	// commit aborts in-flight transaction execution with given signal and resubmits a new one.
 	commit := func(noempty bool, s int32) {
 		if interrupt != nil {
-			atomic.StoreInt32(interrupt, s)
+			atomic.StoreInt32(interrupt, s) // write above previous call of commit(...)
 		}
-		interrupt = new(int32)
+		interrupt = new(int32) // and alloc new memory for this work
+
 		w.newWorkCh <- &newWorkReq{interrupt: interrupt, noempty: noempty, timestamp: timestamp}
+
 		timer.Reset(recommit)
-		atomic.StoreInt32(&w.newTxs, 0)
+
+		atomic.StoreInt32(&w.newTxs, 0) // no new tx!!!
 	}
 	// recalcRecommit recalculates the resubmitting interval upon feedback.
 	recalcRecommit := func(target float64, inc bool) {
@@ -349,21 +357,23 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 	clearPending := func(number uint64) {
 		w.pendingMu.Lock()
 		for h, t := range w.pendingTasks {
-			if t.block.NumberU64()+staleThreshold <= number {
+			if t.block.NumberU64() + staleThreshold <= number {
 				delete(w.pendingTasks, h)
 			}
 		}
-		w.pendingMu.Unlock()
+		w.pendingMu.Unlock() // why not defer?
 	}
 
 	for {
 		select {
 		case <-w.startCh:
+			log.Debug("MY: newWorkLoop got w.startCh")
 			clearPending(w.chain.CurrentBlock().NumberU64())
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
 		case head := <-w.chainHeadCh:
+			log.Debug("MY: newWorkLoop got w.chainHeadCh")
 			if h, ok := w.engine.(consensus.Handler); ok {
 				h.NewChainHead()
 			}
@@ -374,16 +384,21 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case <-timer.C:
 			// If mining is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
+			log.Debug("MY: newWorkLoop got timer.C")
 			if w.isRunning() && (w.config.Clique == nil || w.config.Clique.Period > 0) {
 				// Short circuit if no new transaction arrives.
 				if atomic.LoadInt32(&w.newTxs) == 0 {
 					timer.Reset(recommit)
+					log.Debug("MY: newWorkLoop got timer.C but no new TX, so no work to commit")
 					continue
 				}
-				commit(true, commitInterruptResubmit)
+				log.Debug("MY: newWorkLoop got timer.C and do commit(true, intResubmit)")
+				commit(true, commitInterruptResubmit) // this shit do timer.Reset(...)
 			}
 
 		case interval := <-w.resubmitIntervalCh:
+			log.Debug("MY: newWorkLoop got w.resubmitIntervalCh")
+
 			// Adjust resubmit interval explicitly by user.
 			if interval < minRecommitInterval {
 				log.Warn("Sanitizing miner recommit interval", "provided", interval, "updated", minRecommitInterval)
@@ -397,6 +412,8 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			}
 
 		case adjust := <-w.resubmitAdjustCh:
+			log.Debug("MY: newWorkLoop got w.resubmitAdjustCh")
+
 			// Adjust resubmit interval by feedback.
 			if adjust.inc {
 				before := recommit
@@ -413,6 +430,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			}
 
 		case <-w.exitCh:
+			log.Debug("MY: newWorkLoop got w.exitCh")
 			return
 		}
 	}
@@ -427,14 +445,19 @@ func (w *worker) mainLoop() {
 	for {
 		select {
 		case req := <-w.newWorkCh:
+			log.Debug("MY: mainLoop got w.newWorkCh, so commitNewWork")
 			w.commitNewWork(req.interrupt, req.noempty, req.timestamp)
 
 		case ev := <-w.chainSideCh:
+			log.Debug("MY: mainLoop got w.chainSideCh")
+
 			// Short circuit for duplicate side blocks
 			if _, exist := w.localUncles[ev.Block.Hash()]; exist {
-				continue
+				log.Debug("MY: mainLoop got w.chainSideCh and it is local uncle")
+				continue // we already have this uncle in locally generated
 			}
 			if _, exist := w.remoteUncles[ev.Block.Hash()]; exist {
+				log.Debug("MY: mainLoop got w.chainSideCh and it is remote uncle")
 				continue
 			}
 			// Add side block to possible uncle block set depending on the author.
@@ -446,6 +469,7 @@ func (w *worker) mainLoop() {
 			// If our mining block contains less than 2 uncle blocks,
 			// add the new uncle block if valid and regenerate a mining block.
 			if w.isRunning() && w.current != nil && w.current.uncles.Cardinality() < 2 {
+				log.Debug("MY: mainLoop got w.chainSideCh and it is new and w.current != nil")
 				start := time.Now()
 				if err := w.commitUncle(w.current, ev.Block.Header()); err == nil {
 					var uncles []*types.Header
@@ -469,6 +493,8 @@ func (w *worker) mainLoop() {
 			}
 
 		case ev := <-w.txsCh:
+			log.Debug("MY: mainLoop got w.txsCh")
+
 			// Apply transactions to the pending state if we're not mining.
 			//
 			// Note all transactions received may not be continuous with transactions
@@ -497,12 +523,16 @@ func (w *worker) mainLoop() {
 
 		// System stopped
 		case <-w.exitCh:
+			log.Debug("MY: mainLoop got w.exitCh")
 			return
 		case <-w.txsSub.Err():
+			log.Debug("MY: mainLoop got w.txsSub.Err")
 			return
 		case <-w.chainHeadSub.Err():
+			log.Debug("MY: mainLoop got w.chainHeadSub.Err")
 			return
 		case <-w.chainSideSub.Err():
+			log.Debug("MY: mainLoop got w.chainSideSub.Err")
 			return
 		}
 	}
@@ -526,6 +556,8 @@ func (w *worker) taskLoop() {
 	for {
 		select {
 		case task := <-w.taskCh:
+			log.Debug("MY: taskLoop got w.taskCh")
+
 			if w.newTaskHook != nil {
 				w.newTaskHook(task)
 			}
@@ -549,6 +581,7 @@ func (w *worker) taskLoop() {
 				log.Warn("Block sealing failed", "err", err)
 			}
 		case <-w.exitCh:
+			log.Debug("MY: taskLoop got w.exitCh")
 			interrupt()
 			return
 		}
@@ -561,6 +594,8 @@ func (w *worker) resultLoop() {
 	for {
 		select {
 		case block := <-w.resultCh:
+			log.Debug("MY: resultLoop got w.resultCh")
+
 			// Short circuit when receiving empty result.
 			if block == nil {
 				continue
@@ -634,6 +669,7 @@ func (w *worker) resultLoop() {
 			w.unconfirmed.Insert(block.NumberU64(), block.Hash())
 
 		case <-w.exitCh:
+			log.Debug("MY: resultLoop got w.exitCh")
 			return
 		}
 	}
@@ -886,13 +922,15 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	tstart := time.Now()
 	parent := w.chain.CurrentBlock()
 
-	if parent.Time().Cmp(new(big.Int).SetInt64(timestamp)) >= 0 {
-		timestamp = parent.Time().Int64() + 1
+	if parent.Time().Cmp(new(big.Int).SetInt64(timestamp)) >= 0 { // parent.timestamp >= timestamp
+		timestamp = parent.Time().Int64() + 1 // my timestamp = parent.timestamp + 1
 	}
+
 	// this will ensure we're not going off too far in the future
-	if now := time.Now().Unix(); timestamp > now+1 {
-		wait := time.Duration(timestamp-now) * time.Second
-		log.Info("Mining too far in the future", "wait", common.PrettyDuration(wait))
+	if now := time.Now().Unix(); timestamp > now + 1 {
+		wait := time.Duration(timestamp - now) * time.Second
+
+		log.Info("Mining too far in the future (go to sleep)", "wait", common.PrettyDuration(wait))
 		time.Sleep(wait)
 	}
 
@@ -977,11 +1015,13 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		log.Error("Failed to fetch pending transactions", "err", err)
 		return
 	}
+
 	// Short circuit if there is no available pending transactions
 	if len(pending) == 0 {
 		w.updateSnapshot()
 		return
 	}
+
 	// Split the pending transactions into locals and remotes
 	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
 	for _, account := range w.eth.TxPool().Locals() {
