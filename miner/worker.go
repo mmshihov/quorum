@@ -461,12 +461,14 @@ func (w *worker) mainLoop() {
 				log.Debug("MY: mainLoop got w.chainSideCh and it is remote uncle")
 				continue
 			}
+
 			// Add side block to possible uncle block set depending on the author.
 			if w.isLocalBlock != nil && w.isLocalBlock(ev.Block) {
 				w.localUncles[ev.Block.Hash()] = ev.Block
 			} else {
 				w.remoteUncles[ev.Block.Hash()] = ev.Block
 			}
+
 			// If our mining block contains less than 2 uncle blocks,
 			// add the new uncle block if valid and regenerate a mining block.
 			if w.isRunning() && w.current != nil && w.current.uncles.Cardinality() < 2 {
@@ -604,6 +606,7 @@ func (w *worker) resultLoop() {
 			}
 			// Short circuit when receiving duplicate result caused by resubmitting.
 			if w.chain.HasBlock(block.Hash(), block.NumberU64()) {
+				log.Debug("MY: resultLoop got w.resultCh but block is exist in BC")
 				continue
 			}
 
@@ -936,7 +939,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	if now := time.Now().Unix(); timestamp > now + 1 {
 		wait := time.Duration(timestamp - now) * time.Second
 
-		log.Info("Mining too far in the future (go to sleep)", "wait", common.PrettyDuration(wait))
+		log.Debug("MY: Mining too far in the future (go to sleep)", "wait", common.PrettyDuration(wait))
 		time.Sleep(wait)
 	}
 
@@ -956,7 +959,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		}
 		header.Coinbase = w.coinbase
 	}
-	if err := w.engine.Prepare(w.chain, header); err != nil {
+	if err := w.engine.Prepare(w.chain, header); err != nil { // установит block.Time равным таймстампу предыдущего блока плюс блокпериод
 		log.Error("Failed to prepare header for mining", "err", err)
 		return
 	}
@@ -989,7 +992,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	commitUncles := func(blocks map[common.Hash]*types.Block) {
 		// Clean up stale uncle blocks first
 		for hash, uncle := range blocks {
-			if uncle.NumberU64()+staleThreshold <= header.Number.Uint64() {
+			if uncle.NumberU64() + staleThreshold <= header.Number.Uint64() {
 				delete(blocks, hash)
 			}
 		}
@@ -1025,6 +1028,8 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// Short circuit if there is no available pending transactions
 	if len(pending) == 0 {
 		w.updateSnapshot()
+
+		log.Debug("MY: no pending transactions (just update snapshoot)")
 		return
 	}
 
@@ -1071,6 +1076,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 	ps := w.current.privateState.Copy()
 	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, uncles, w.current.receipts)
 	if err != nil {
+		log.Debug("MY: commit(){ ... bad block finalisation ...}")
 		return err
 	}
 	if w.isRunning() {
