@@ -413,6 +413,11 @@ func (sb *backend) Finalize(chain consensus.ChainReader, header *types.Header, s
 // seal place on top.
 func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
 
+	if len(block.Transactions()) == 0 {
+		log.Debug("MY: Sealing paused, waiting for transactions")
+		return nil // no error
+	}
+
 	// update the block header timestamp and signature and propose the block to core engine
 	header := block.Header()
 	number := header.Number.Uint64()

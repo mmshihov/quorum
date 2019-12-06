@@ -371,7 +371,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			log.Debug("MY: newWorkLoop got w.startCh")
 			clearPending(w.chain.CurrentBlock().NumberU64())
 			timestamp = time.Now().Unix()
-			commit(false, commitInterruptNewHead)
+			commit(true, commitInterruptNewHead)
 
 		case head := <-w.chainHeadCh:
 			log.Debug("MY: newWorkLoop got w.chainHeadCh")
@@ -380,7 +380,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			}
 			clearPending(head.Block.NumberU64()) // мы очистили задачи на майнинг
 			timestamp = time.Now().Unix()
-			commit(false, commitInterruptNewHead)
+			commit(true, commitInterruptNewHead)
 
 //		case <-timer.C:
 //			// If mining is running resubmit a new work cycle periodically to pull in
