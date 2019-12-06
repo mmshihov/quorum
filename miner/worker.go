@@ -378,7 +378,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			if h, ok := w.engine.(consensus.Handler); ok {
 				h.NewChainHead() // emit preprepare in consensus...
 			}
-			clearPending(head.Block.NumberU64())
+			clearPending(head.Block.NumberU64()) // мы очистили задачи на майнинг
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
@@ -599,13 +599,16 @@ func (w *worker) resultLoop() {
 
 			// Short circuit when receiving empty result.
 			if block == nil {
-				log.Debug("MY: resultLoop got w.resultCh but block==nill")
+				log.Debug("MY: resultLoop got w.resultCh but (block == nil)")
 				continue
 			}
 			// Short circuit when receiving duplicate result caused by resubmitting.
 			if w.chain.HasBlock(block.Hash(), block.NumberU64()) {
 				continue
 			}
+
+			log.Debug("MY: resultLoop got w.resultCh", "block.number", block.NumberU64(), "block.hash", block.Hash())
+
 			var (
 				sealhash = w.engine.SealHash(block.Header())
 				hash     = block.Hash()
@@ -613,6 +616,7 @@ func (w *worker) resultLoop() {
 			w.pendingMu.RLock()
 			task, exist := w.pendingTasks[sealhash]
 			w.pendingMu.RUnlock()
+
 			if !exist {
 				log.Error("Block found but no relative pending task", "number", block.Number(), "sealhash", sealhash, "hash", hash)
 				continue
