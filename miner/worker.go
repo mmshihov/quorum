@@ -519,11 +519,8 @@ func (w *worker) mainLoop() {
 			} else {
 				// If we're mining, but nothing is being processed, wake on new transactions
 				log.Debug("MY: mainLoop got txs and running miner")
-				if w.config.Clique != nil && w.config.Clique.Period == 0 {
-					log.Debug("MY: mainLoop got txs and running miner, and Clicque settings is ok")
 
-					w.commitNewWork(nil, false, time.Now().Unix())
-				}
+				w.commitNewWork(nil, true, time.Now().Unix())
 			}
 			atomic.AddInt32(&w.newTxs, int32(len(ev.Txs)))
 
