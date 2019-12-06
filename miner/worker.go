@@ -518,7 +518,10 @@ func (w *worker) mainLoop() {
 				w.updateSnapshot()
 			} else {
 				// If we're mining, but nothing is being processed, wake on new transactions
+				log.Debug("MY: mainLoop got txs and running miner")
 				if w.config.Clique != nil && w.config.Clique.Period == 0 {
+					log.Debug("MY: mainLoop got txs and running miner, and Clicque settings is ok")
+
 					w.commitNewWork(nil, false, time.Now().Unix())
 				}
 			}
