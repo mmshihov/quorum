@@ -316,8 +316,8 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		timestamp   int64      // timestamp for each round of mining.
 	)
 
-	timer := time.NewTimer(0)
-	<-timer.C // discard the initial tick
+	//timer := time.NewTimer(0)
+	//<-timer.C // discard the initial tick
 
 	// commit aborts in-flight transaction execution with given signal and resubmits a new one.
 	commit := func(noempty bool, s int32) {
@@ -328,7 +328,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 
 		w.newWorkCh <- &newWorkReq{interrupt: interrupt, noempty: noempty, timestamp: timestamp}
 
-		timer.Reset(recommit)
+		//timer.Reset(recommit)
 
 		atomic.StoreInt32(&w.newTxs, 0) // no new tx!!!
 	}
@@ -364,6 +364,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		w.pendingMu.Unlock() // why not defer?
 	}
 
+	// как блоки генерятся без таймера?
 	for {
 		select {
 		case <-w.startCh:
@@ -375,26 +376,26 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case head := <-w.chainHeadCh:
 			log.Debug("MY: newWorkLoop got w.chainHeadCh")
 			if h, ok := w.engine.(consensus.Handler); ok {
-				h.NewChainHead()
+				h.NewChainHead() // emit preprepare in consensus...
 			}
 			clearPending(head.Block.NumberU64())
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
-		case <-timer.C:
-			// If mining is running resubmit a new work cycle periodically to pull in
-			// higher priced transactions. Disable this overhead for pending blocks.
-			log.Debug("MY: newWorkLoop got timer.C")
-			if w.isRunning() && (w.config.Clique == nil || w.config.Clique.Period > 0) {
-				// Short circuit if no new transaction arrives.
-				if atomic.LoadInt32(&w.newTxs) == 0 {
-					timer.Reset(recommit)
-					log.Debug("MY: newWorkLoop got timer.C but no new TX, so no work to commit")
-					continue
-				}
-				log.Debug("MY: newWorkLoop got timer.C and do commit(true, intResubmit)")
-				commit(true, commitInterruptResubmit) // this shit do timer.Reset(...)
-			}
+//		case <-timer.C:
+//			// If mining is running resubmit a new work cycle periodically to pull in
+//			// higher priced transactions. Disable this overhead for pending blocks.
+//			log.Debug("MY: newWorkLoop got timer.C")
+//			if w.isRunning() && (w.config.Clique == nil || w.config.Clique.Period > 0) {
+//				// Short circuit if no new transaction arrives.
+//				if atomic.LoadInt32(&w.newTxs) == 0 {
+//					timer.Reset(recommit)
+//					log.Debug("MY: newWorkLoop got timer.C but no new TX, so no work to commit")
+//					continue
+//				}
+//				log.Debug("MY: newWorkLoop got timer.C and do commit(true, intResubmit)")
+//				commit(true, commitInterruptResubmit) // this shit do timer.Reset(...)
+//			}
 
 		case interval := <-w.resubmitIntervalCh:
 			log.Debug("MY: newWorkLoop got w.resubmitIntervalCh")
@@ -598,6 +599,7 @@ func (w *worker) resultLoop() {
 
 			// Short circuit when receiving empty result.
 			if block == nil {
+				log.Debug("MY: resultLoop got w.resultCh but block==nill")
 				continue
 			}
 			// Short circuit when receiving duplicate result caused by resubmitting.
