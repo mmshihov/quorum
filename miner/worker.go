@@ -559,7 +559,7 @@ func (w *worker) taskLoop() {
 	for {
 		select {
 		case task := <-w.taskCh:
-			log.Debug("MY: taskLoop got w.taskCh")
+			log.Debug("MY: taskLoop got w.taskCh", "block.number", task.block.Number())
 
 			if w.newTaskHook != nil {
 				w.newTaskHook(task)

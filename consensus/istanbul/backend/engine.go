@@ -435,6 +435,7 @@ func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
+
 	block, err = sb.updateBlock(parent, block)
 	if err != nil {
 		return err
@@ -446,7 +447,11 @@ func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results
 		// wait for the timestamp of header, use this to adjust the block period
 		select {
 		case <-time.After(delay):
+			log.Debug("MY: Wait some delay")
+
 		case <-stop:
+			log.Debug("MY: Seal (stop message before consensus)")
+
 			results <- nil
 			return
 		}
@@ -459,25 +464,34 @@ func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results
 			sb.proposedBlockHash = common.Hash{}
 			sb.sealMu.Unlock()
 		}()
+
 		// post block into Istanbul engine
 		go sb.EventMux().Post(istanbul.RequestEvent{
 			Proposal: block,
 		})
+
 		for {
 			select {
 			case result := <-sb.commitCh:
+				log.Debug("MY: Seal got sb.commitCh")
+
 				// if the block hash and the hash from channel are the same,
 				// return the result. Otherwise, keep waiting the next hash.
 				if result != nil && block.Hash() == result.Hash() {
+					log.Debug("MY: Seal got sb.commitCh and result is mine and OK")
+
 					results <- result
 					return
 				}
 			case <-stop:
+				log.Debug("MY: Seal (stop message) in consensus progress")
+
 				results <- nil
 				return
 			}
 		}
 	}()
+
 	return nil
 }
 
