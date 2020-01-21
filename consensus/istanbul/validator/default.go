@@ -120,7 +120,7 @@ func (valSet *defaultSet) CalcProposer(lastProposer common.Address, round uint64
 func calcSeed(valSet istanbul.ValidatorSet, proposer common.Address, round uint64) uint64 {
 	offset := 0
 	if idx, val := valSet.GetByAddress(proposer); val != nil {
-		offset = idx
+		offset = idx // TODO: what for this offset? if proposer is different on nodes - so is different new proposer selection
 	}
 	return uint64(offset) + round
 }

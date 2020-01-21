@@ -552,10 +552,11 @@ func (w *worker) taskLoop() {
 	// interrupt aborts the in-flight sealing task.
 	interrupt := func() {
 		if stopCh != nil {
-			close(stopCh)
+			close(stopCh) // MY: разлочит метод Seal в engine
 			stopCh = nil
 		}
 	}
+
 	for {
 		select {
 		case task := <-w.taskCh:
@@ -565,13 +566,15 @@ func (w *worker) taskLoop() {
 				w.newTaskHook(task)
 			}
 			// Reject duplicate sealing work due to resubmitting.
+			// TODO: а если сюда придет пустой блок? запорем sealHash? стоит контролировать на пустоту блока до этого момента?
 			sealHash := w.engine.SealHash(task.block.Header())
 			if sealHash == prev {
 				continue
 			}
 			// Interrupt previous sealing operation
-			interrupt()
-			stopCh, prev = make(chan struct{}), sealHash
+			interrupt() // MY: закроет канал stopCh, и освободит критическую секцию в Seal...
+
+			stopCh, prev = make(chan struct{}), sealHash //MY: создаем новый канал для остановки выполнения Seal
 
 			if w.skipSealHook != nil && w.skipSealHook(task) {
 				continue
@@ -580,7 +583,7 @@ func (w *worker) taskLoop() {
 			w.pendingTasks[w.engine.SealHash(task.block.Header())] = task
 			w.pendingMu.Unlock()
 
-			if err := w.engine.Seal(w.chain, task.block, w.resultCh, stopCh); err != nil {
+			if err := w.engine.Seal(w.chain, task.block, w.resultCh, stopCh); err != nil { //MY: here we start istanbul consensus (seal block -> {pre-prepare,block})
 				log.Warn("Block sealing failed", "err", err)
 			}
 		case <-w.exitCh:

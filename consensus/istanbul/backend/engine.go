@@ -411,11 +411,12 @@ func (sb *backend) Finalize(chain consensus.ChainReader, header *types.Header, s
 
 // Seal generates a new block for the given input block with the local miner's
 // seal place on top.
+// MY: это начинает консенсус на блоке среди валидаторов
 func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
 
 	if len(block.Transactions()) == 0 {
 		log.Debug("MY: Sealing paused, waiting for transactions")
-		return nil // no error
+		return consensus.ErrEmptyBlock //TODO: raise error (it should not happen)
 	}
 
 	// update the block header timestamp and signature and propose the block to core engine
@@ -457,6 +458,9 @@ func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results
 		}
 
 		// get the proposed block hash and clear it if the seal() is completed.
+
+		// MY:	синхронизация мьютексом. в критическую секцию нелзя будет войти, пока не придет ответ от
+		// 		sb.commitCh, все остальные процессы встрянут здесь
 		sb.sealMu.Lock()
 		sb.proposedBlockHash = block.Hash()
 
@@ -470,18 +474,26 @@ func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results
 			Proposal: block,
 		})
 
-		for {
+		for { // MY: этот цикл выполняется в критической секции по sb.sealMu
 			select {
 			case result := <-sb.commitCh:
 				log.Debug("MY: Seal got sb.commitCh")
 
 				// if the block hash and the hash from channel are the same,
 				// return the result. Otherwise, keep waiting the next hash.
+
+				// MY: если сюда пришел результат консенсуса, то куда-то не пришел?
 				if result != nil && block.Hash() == result.Hash() {
 					log.Debug("MY: Seal got sb.commitCh and result is mine and OK")
 
 					results <- result
 					return
+				} else {
+					if result != nil {
+						log.Debug("MY: got failed result", "need_block.Hash", block.Hash(), "got_result.Hash", result.Hash())
+					} else {
+						log.Debug("MY: got failed result (==nil)")
+					}
 				}
 			case <-stop:
 				log.Debug("MY: Seal (stop message) in consensus progress")
