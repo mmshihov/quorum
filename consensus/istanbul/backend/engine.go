@@ -459,12 +459,16 @@ func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results
 
 		// get the proposed block hash and clear it if the seal() is completed.
 
+		log.Debug("MY: seal start-> critical section", "block.number", number)
+
 		// MY:	синхронизация мьютексом. в критическую секцию нелзя будет войти, пока не придет ответ от
 		// 		sb.commitCh, все остальные процессы встрянут здесь
 		sb.sealMu.Lock()
 		sb.proposedBlockHash = block.Hash()
 
 		defer func() {
+			log.Debug("MY: seal <-leave critical section", "block.number", number)
+
 			sb.proposedBlockHash = common.Hash{}
 			sb.sealMu.Unlock()
 		}()
@@ -477,12 +481,11 @@ func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results
 		for { // MY: этот цикл выполняется в критической секции по sb.sealMu
 			select {
 			case result := <-sb.commitCh:
-				log.Debug("MY: Seal got sb.commitCh")
-
 				// if the block hash and the hash from channel are the same,
 				// return the result. Otherwise, keep waiting the next hash.
 
 				// MY: если сюда пришел результат консенсуса, то куда-то не пришел?
+				// пропосер майнит блок, его принимает консенсус (а что происходит на непропосерах?)
 				if result != nil && block.Hash() == result.Hash() {
 					log.Debug("MY: Seal got sb.commitCh and result is mine and OK")
 
