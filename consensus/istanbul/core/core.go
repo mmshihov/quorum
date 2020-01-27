@@ -170,6 +170,11 @@ func (c *core) IsCurrentProposal(blockHash common.Hash) bool {
 }
 
 func (c *core) commit() {
+	logger := c.logger.New("state", c.state)
+
+	logger.Debug("MY: istanbul.core.commit()")
+	//TODO: c.current.GetLockedHash()
+
 	c.setState(StateCommitted)
 
 	proposal := c.current.Proposal()
@@ -327,6 +332,9 @@ func (c *core) stopTimer() {
 }
 
 func (c *core) newRoundChangeTimer() {
+	logger := c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.valSet.GetProposer())
+
+	logger.Debug("MY: istanbul.core.newRoundChangeTimer")
 	c.stopTimer()
 
 	// set timeout based on the round number

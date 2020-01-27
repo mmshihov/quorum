@@ -26,6 +26,9 @@ import (
 
 // sendNextRoundChange sends the ROUND CHANGE message with current round + 1
 func (c *core) sendNextRoundChange() {
+	logger := c.logger.New("state", c.state)
+	logger.Debug("istanbul.core.sendNextRoundChange()")
+
 	cv := c.currentView()
 	c.sendRoundChange(new(big.Int).Add(cv.Round, common.Big1))
 }
@@ -33,6 +36,7 @@ func (c *core) sendNextRoundChange() {
 // sendRoundChange sends the ROUND CHANGE message with the given round
 func (c *core) sendRoundChange(round *big.Int) {
 	logger := c.logger.New("state", c.state)
+	logger.Debug("istanbul.core.sendRoundChange()", "round", round)
 
 	cv := c.currentView()
 	if cv.Round.Cmp(round) >= 0 {

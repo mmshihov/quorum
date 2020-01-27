@@ -181,6 +181,9 @@ func (c *core) handleCheckedMsg(msg *message, src istanbul.Validator) error {
 }
 
 func (c *core) handleTimeoutMsg() {
+	logger := c.logger.New("state", c.state)
+
+	logger.Debug("MY: istanbul.core.handleTimeoutMsg")
 	// If we're not waiting for round change yet, we can try to catch up
 	// the max round with F+1 round change message. We only need to catch up
 	// if the max round is larger than current round.

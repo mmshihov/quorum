@@ -21,7 +21,7 @@ import "github.com/ethereum/go-ethereum/consensus/istanbul"
 func (c *core) handleRequest(request *istanbul.Request) error {
 	logger := c.logger.New("state", c.state, "seq", c.current.sequence)
 
-	logger.Warn("MY:FUCK DEBUG!!! ")
+	logger.Debug("MY:istanbul.core.handleRequest()", "rq.hash", request.Proposal.Hash(), "rq.number", request.Proposal.Number())
 
 	if err := c.checkRequestMsg(request); err != nil {
 		if err == errInvalidMessage {
@@ -37,7 +37,10 @@ func (c *core) handleRequest(request *istanbul.Request) error {
 	c.current.pendingRequest = request
 	if c.state == StateAcceptRequest {
 		c.sendPreprepare(request) // ТУДУХДУДУХ: препреперь!!!
+
+		logger.Debug("MY:istanbul.core.handleRequest() state accept request")
 	}
+
 	return nil
 }
 

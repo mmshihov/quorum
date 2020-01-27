@@ -48,6 +48,7 @@ func (c *core) sendPreprepare(request *istanbul.Request) {
 func (c *core) handlePreprepare(msg *message, src istanbul.Validator) error {
 	logger := c.logger.New("from", src, "state", c.state)
 
+	logger.Debug("MY: istanbul.core.handlePreprepare", "validator.address", src.Address())
 	// Decode PRE-PREPARE
 	var preprepare *istanbul.Preprepare
 	err := msg.Decode(&preprepare)
@@ -93,7 +94,7 @@ func (c *core) handlePreprepare(msg *message, src istanbul.Validator) error {
 				})
 			})
 		} else {
-			logger.Warn("Failed to verify proposal", "err", err, "duration", duration)
+			logger.Warn("MY: Failed to verify proposal", "err", err, "duration", duration)
 			c.sendNextRoundChange()
 		}
 		return err
@@ -110,6 +111,7 @@ func (c *core) handlePreprepare(msg *message, src istanbul.Validator) error {
 				c.sendCommit()
 			} else {
 				// Send round change
+				logger.Debug("MY:No locked hash for preprepare", "preprepare", preprepare.Proposal.Hash(), "locked", c.current.GetLockedHash())
 				c.sendNextRoundChange()
 			}
 		} else {
