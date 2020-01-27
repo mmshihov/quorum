@@ -415,6 +415,7 @@ func (sb *backend) Finalize(chain consensus.ChainReader, header *types.Header, s
 // seal place on top.
 // MY: это начинает консенсус на блоке среди валидаторов
 func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
+	log.Debug("MY: Seal()")
 
 	if len(block.Transactions()) == 0 {
 		log.Debug("MY: Sealing paused, waiting for transactions")

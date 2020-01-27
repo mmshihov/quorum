@@ -21,6 +21,8 @@ import "github.com/ethereum/go-ethereum/consensus/istanbul"
 func (c *core) handleRequest(request *istanbul.Request) error {
 	logger := c.logger.New("state", c.state, "seq", c.current.sequence)
 
+	logger.Warn("MY:FUCK DEBUG!!! ")
+
 	if err := c.checkRequestMsg(request); err != nil {
 		if err == errInvalidMessage {
 			logger.Warn("invalid request")
