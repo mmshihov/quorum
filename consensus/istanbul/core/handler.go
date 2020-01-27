@@ -95,7 +95,7 @@ func (c *core) handleEvents() {
 				if err == errFutureMessage {
 					c.storeRequestMsg(r)
 				}
-			case istanbul.MessageEvent:
+			case istanbul.MessageEvent: // одно из событий: preprepare, prepare, commit,
 				if err := c.handleMsg(ev.Payload); err == nil {
 					c.backend.Gossip(c.valSet, ev.Payload)
 				}

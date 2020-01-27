@@ -335,6 +335,8 @@ func (sb *backend) VerifySeal(chain consensus.ChainReader, header *types.Header)
 // Prepare initializes the consensus fields of a block header according to the
 // rules of a particular engine. The changes are executed inline.
 func (sb *backend) Prepare(chain consensus.ChainReader, header *types.Header) error {
+	log.Debug("MY: istanbul.Prepare(chain consensus.ChainReader, header *types.Header)")
+
 	// unused fields, force to set to empty
 	header.Coinbase = common.Address{}
 	header.Nonce = emptyNonce
@@ -416,7 +418,7 @@ func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results
 
 	if len(block.Transactions()) == 0 {
 		log.Debug("MY: Sealing paused, waiting for transactions")
-		return consensus.ErrEmptyBlock //TODO: raise error (it should not happen)
+		return consensus.ErrEmptyBlock //TODO: raise error (it should not happen)fvgb
 	}
 
 	// update the block header timestamp and signature and propose the block to core engine
@@ -493,13 +495,13 @@ func (sb *backend) Seal(chain consensus.ChainReader, block *types.Block, results
 					return
 				} else {
 					if result != nil {
-						log.Debug("MY: got failed result", "need_block.Hash", block.Hash(), "got_result.Hash", result.Hash())
+						log.Debug("MY: Seal got failed result", "need_block.Hash", block.Hash(), "got_result.Hash", result.Hash())
 					} else {
-						log.Debug("MY: got failed result (==nil)")
+						log.Debug("MY: Seal got failed result (==nil)")
 					}
 				}
 			case <-stop:
-				log.Debug("MY: Seal (stop message) in consensus progress")
+				log.Debug("MY: Seal (stop message) in consensus progress", "block.number", number, "block.Hash", block.Hash())
 
 				results <- nil
 				return

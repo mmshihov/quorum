@@ -328,7 +328,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 
 		w.newWorkCh <- &newWorkReq{interrupt: interrupt, noempty: noempty, timestamp: timestamp}
 
-		//timer.Reset(recommit)
+		//timer.Reset(recommit) // эту штуку нельзя делать тут, так как таймер должен сработать к моменту reset
 
 		atomic.StoreInt32(&w.newTxs, 0) // no new tx!!!
 	}
@@ -445,9 +445,9 @@ func (w *worker) mainLoop() {
 
 	for {
 		select {
-		case req := <-w.newWorkCh:
+		case req := <-w.newWorkCh: // работа приходит, если пришла новая башка БЧ
 			log.Debug("MY: mainLoop got w.newWorkCh, so commitNewWork")
-			w.commitNewWork(req.interrupt, req.noempty, req.timestamp)
+			w.commitNewWork(req.interrupt, req.noempty, req.timestamp) // TODO: привотит ли этот вызов к Seal?
 
 		case ev := <-w.chainSideCh:
 			log.Debug("MY: mainLoop got w.chainSideCh")
@@ -843,7 +843,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 					inc:   true,
 				}
 			}
-			return atomic.LoadInt32(interrupt) == commitInterruptNewHead
+			return atomic.LoadInt32(interrupt) == commitInterruptNewHead  // если было прерывание, ничего не вычисляем и возвращаем управление
 		}
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {
@@ -928,14 +928,14 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 
 // commitNewWork generates several new sealing tasks based on the parent block.
 func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) {
-	w.mu.RLock()
+	w.mu.RLock() // процедурка в критической секции
 	defer w.mu.RUnlock()
 
 	tstart := time.Now()
 	parent := w.chain.CurrentBlock()
 
 	if parent.Time().Cmp(new(big.Int).SetInt64(timestamp)) >= 0 { // parent.timestamp >= timestamp
-		timestamp = parent.Time().Int64() + 1 // my timestamp = parent.timestamp + 1
+		timestamp = parent.Time().Int64() + 1 // my timestamp = parent.timestamp + 1 ? sec?
 	}
 
 	// this will ensure we're not going off too far in the future
@@ -947,7 +947,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 
 	num := parent.Number()
-	header := &types.Header{
+	header := &types.Header{ // создали новую копию заголовка в памяти
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent, w.gasFloor, w.gasCeil),
@@ -955,14 +955,16 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		Time:       big.NewInt(timestamp),
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)
+
 	if w.isRunning() {
 		if w.coinbase == (common.Address{}) {
 			log.Error("Refusing to mine without etherbase")
 			return
 		}
-		header.Coinbase = w.coinbase
+		header.Coinbase = w.coinbase // фантастика, но вызов w.engine.Prepare() нахер это затрет
 	}
 	if err := w.engine.Prepare(w.chain, header); err != nil { // установит block.Time равным таймстампу предыдущего блока плюс блокпериод
+		// а эта говнота очень похожа на название раунда консенсуса, но нет, это матьего подготовка полей заголовка блока
 		log.Error("Failed to prepare header for mining", "err", err)
 		return
 	}
@@ -980,13 +982,13 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		}
 	}
 	// Could potentially happen if starting to mine in an odd state.
-	err := w.makeCurrent(parent, header)
+	err := w.makeCurrent(parent, header) // в состоянии w создаем структуру env (w.current)
 	if err != nil {
 		log.Error("Failed to create mining context", "err", err)
 		return
 	}
 	// Create the current work task and check any fork transitions needed
-	env := w.current
+	env := w.current  // в критической секции выполняется все это это!!! поэтому эта неочевидная хренота не гонкается
 	if w.config.DAOForkSupport && w.config.DAOForkBlock != nil && w.config.DAOForkBlock.Cmp(header.Number) == 0 {
 		misc.ApplyDAOHardFork(env.state)
 	}
@@ -1047,7 +1049,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	if len(localTxs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, localTxs)
 		if w.commitTransactions(txs, w.coinbase, interrupt) {
-			return
+			return // если новая башка добылась или текущего состояния нету
 		}
 	}
 	if len(remoteTxs) > 0 {
@@ -1056,6 +1058,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 	}
+
 	w.commit(uncles, w.fullTaskHook, true, tstart)
 }
 

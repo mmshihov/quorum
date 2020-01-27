@@ -197,6 +197,8 @@ func (c *core) startNewRound(round *big.Int) {
 		logger = c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence())
 	}
 
+	logger.Debug("MY:FUCK startNewRound()!!!")
+
 	roundChange := false
 	// Try to get last proposal
 	lastProposal, lastProposer := c.backend.LastProposal()
