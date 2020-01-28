@@ -180,7 +180,8 @@ func (c *core) handleCheckedMsg(msg *message, src istanbul.Validator) error {
 	return errInvalidMessage
 }
 
-func (c *core) handleTimeoutMsg() {
+func (c *core) handleTimeoutMsg() { // timeoutEvent handler
+									// время раунда консенсуса истекло
 	logger := c.logger.New("state", c.state)
 
 	logger.Debug("MY: istanbul.core.handleTimeoutMsg")
@@ -200,6 +201,7 @@ func (c *core) handleTimeoutMsg() {
 		c.logger.Trace("round change timeout, catch up latest sequence", "number", lastProposal.Number().Uint64())
 		c.startNewRound(common.Big0)
 	} else {
+		c.logger.Debug("MY: istanbul.core.handleTimeoutMsg", "proposal", lastProposal)
 		c.sendNextRoundChange()
 	}
 }

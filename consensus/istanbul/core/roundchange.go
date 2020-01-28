@@ -36,7 +36,7 @@ func (c *core) sendNextRoundChange() {
 // sendRoundChange sends the ROUND CHANGE message with the given round
 func (c *core) sendRoundChange(round *big.Int) {
 	logger := c.logger.New("state", c.state)
-	logger.Debug("istanbul.core.sendRoundChange()", "round", round)
+	logger.Debug("MY: istanbul.core.sendRoundChange()", "round", round)
 
 	cv := c.currentView()
 	if cv.Round.Cmp(round) >= 0 {
@@ -71,6 +71,7 @@ func (c *core) sendRoundChange(round *big.Int) {
 
 func (c *core) handleRoundChange(msg *message, src istanbul.Validator) error {
 	logger := c.logger.New("state", c.state, "from", src.Address().Hex())
+	logger.Debug("MY: istanbul.core.handleRoundChange()", "src.address", src.Address())
 
 	// Decode ROUND CHANGE message
 	var rc *istanbul.Subject
@@ -104,7 +105,7 @@ func (c *core) handleRoundChange(msg *message, src istanbul.Validator) error {
 		return nil
 	} else if num == c.QuorumSize() && (c.waitingForRoundChange || cv.Round.Cmp(roundView.Round) < 0) {
 		// We've received 2f+1/Ceil(2N/3) ROUND CHANGE messages, start a new round immediately.
-		c.startNewRound(roundView.Round)
+		c.startNewRound(roundView.Round) // TODO: начинаем новый раунд в ответ на получение
 		return nil
 	} else if cv.Round.Cmp(roundView.Round) < 0 {
 		// Only gossip the message with current round to other validators.
@@ -125,7 +126,7 @@ func newRoundChangeSet(valSet istanbul.ValidatorSet) *roundChangeSet {
 
 type roundChangeSet struct {
 	validatorSet istanbul.ValidatorSet
-	roundChanges map[uint64]*messageSet
+	roundChanges map[uint64]*messageSet // round->{messages}
 	mu           *sync.Mutex
 }
 
@@ -158,16 +159,16 @@ func (rcs *roundChangeSet) Clear(round *big.Int) {
 }
 
 // MaxRound returns the max round which the number of messages is equal or larger than num
-func (rcs *roundChangeSet) MaxRound(num int) *big.Int {
+func (rcs *roundChangeSet) MaxRound(messageCount int) *big.Int {
 	rcs.mu.Lock()
 	defer rcs.mu.Unlock()
 
 	var maxRound *big.Int
-	for k, rms := range rcs.roundChanges {
-		if rms.Size() < num {
+	for round, rms := range rcs.roundChanges {
+		if rms.Size() < messageCount {
 			continue
 		}
-		r := big.NewInt(int64(k))
+		r := big.NewInt(int64(round))
 		if maxRound == nil || maxRound.Cmp(r) < 0 {
 			maxRound = r
 		}

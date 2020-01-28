@@ -38,6 +38,9 @@ func (c *core) sendPrepare() {
 }
 
 func (c *core) handlePrepare(msg *message, src istanbul.Validator) error {
+	logger := c.logger.New("from", src, "state", c.state)
+	logger.Debug("MY: istanbul.core.handlePrepare()", "validator.address", src.Address())
+
 	// Decode PREPARE message
 	var prepare *istanbul.Subject
 	err := msg.Decode(&prepare)
