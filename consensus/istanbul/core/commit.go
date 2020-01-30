@@ -24,11 +24,17 @@ import (
 )
 
 func (c *core) sendCommit() {
+	logger := c.logger.New("state", c.state)
+	logger.Debug("MY:sendCommit->")
+
 	sub := c.current.Subject()
 	c.broadcastCommit(sub)
 }
 
 func (c *core) sendCommitForOldBlock(view *istanbul.View, digest common.Hash) {
+	logger := c.logger.New("state", c.state)
+	logger.Debug("MY:sendCommitForOldBlock->")
+
 	sub := &istanbul.Subject{
 		View:   view,
 		Digest: digest,
@@ -38,6 +44,7 @@ func (c *core) sendCommitForOldBlock(view *istanbul.View, digest common.Hash) {
 
 func (c *core) broadcastCommit(sub *istanbul.Subject) {
 	logger := c.logger.New("state", c.state)
+	logger.Debug("MY:broadcastCommit->")
 
 	encodedSubject, err := Encode(sub)
 	if err != nil {

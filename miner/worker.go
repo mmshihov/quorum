@@ -374,7 +374,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			commit(true, commitInterruptNewHead)
 
 		case head := <-w.chainHeadCh:
-			log.Debug("MY: newWorkLoop got w.chainHeadCh")
+			log.Debug("MY: newWorkLoop got w.chainHeadCh", "chain.head.block.number", head.Block.NumberU64())
 			if h, ok := w.engine.(consensus.Handler); ok {
 				h.NewChainHead() // emit preprepare in consensus...
 			}

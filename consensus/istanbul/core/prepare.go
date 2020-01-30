@@ -24,6 +24,7 @@ import (
 
 func (c *core) sendPrepare() {
 	logger := c.logger.New("state", c.state)
+	logger.Debug("MY:sendPrepare->")
 
 	sub := c.current.Subject()
 	encodedSubject, err := Encode(sub)
@@ -31,6 +32,9 @@ func (c *core) sendPrepare() {
 		logger.Error("Failed to encode", "subject", sub)
 		return
 	}
+
+	logger.Debug("MY:sendPrepare broadcast PREPARE")
+
 	c.broadcast(&message{
 		Code: msgPrepare,
 		Msg:  encodedSubject,

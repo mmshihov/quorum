@@ -157,6 +157,10 @@ func (c *core) handleCheckedMsg(msg *message, src istanbul.Validator) error {
 
 	// Store the message if it's a future message
 	testBacklog := func(err error) error {
+		if err != nil {
+			logger.Debug("MY:handleCheckedMsg", "error", err)
+		}
+
 		if err == errFutureMessage {
 			c.storeBacklog(msg, src)
 		}
@@ -199,7 +203,7 @@ func (c *core) handleTimeoutMsg() { // timeoutEvent handler
 	lastProposal, _ := c.backend.LastProposal()
 	if lastProposal != nil && lastProposal.Number().Cmp(c.current.Sequence()) >= 0 {
 		c.logger.Trace("round change timeout, catch up latest sequence", "number", lastProposal.Number().Uint64())
-		c.startNewRound(common.Big0)
+		c.startNewRound(common.Big0) //TODO: how it helps? if current.Sequence < lastProposal.Number sequence is not harmonised!!!
 	} else {
 		c.logger.Debug("MY: istanbul.core.handleTimeoutMsg", "proposal", lastProposal)
 		c.sendNextRoundChange()

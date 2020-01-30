@@ -203,7 +203,7 @@ func (c *core) startNewRound(round *big.Int) {
 		logger = c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence())
 	}
 
-	logger.Debug("MY:FUCK startNewRound()!!!")
+	logger.Debug("MY:istanbul.core.startNewRound->", "round", round)
 
 	roundChange := false
 	// Try to get last proposal
@@ -212,13 +212,13 @@ func (c *core) startNewRound(round *big.Int) {
 		logger.Trace("Start to the initial round")
 	} else if lastProposal.Number().Cmp(c.current.Sequence()) >= 0 {
 		diff := new(big.Int).Sub(lastProposal.Number(), c.current.Sequence())
-		c.sequenceMeter.Mark(new(big.Int).Add(diff, common.Big1).Int64())
+		c.sequenceMeter.Mark(new(big.Int).Add(diff, common.Big1).Int64()) // !IT JUST MEASUREMENT!
 
 		if !c.consensusTimestamp.IsZero() {
-			c.consensusTimer.UpdateSince(c.consensusTimestamp)
+			c.consensusTimer.UpdateSince(c.consensusTimestamp) // !(IT CONSENSUS DURATION MEASUREMENT, IT REGISTERED AND PROVIDES INFO TO DOWN LEVELS)!
 			c.consensusTimestamp = time.Time{}
 		}
-		logger.Trace("Catch up latest proposal", "number", lastProposal.Number().Uint64(), "hash", lastProposal.Hash())
+		logger.Trace("Catch up latest proposal", "lastProposal.number", lastProposal.Number().Uint64(), "hash", lastProposal.Hash(), "current.sequence", c.current.Sequence().Uint64())
 	} else if lastProposal.Number().Cmp(big.NewInt(c.current.Sequence().Int64()-1)) == 0 {
 		if round.Cmp(common.Big0) == 0 {
 			// same seq and round, don't need to start new round
@@ -228,6 +228,8 @@ func (c *core) startNewRound(round *big.Int) {
 			return
 		}
 		roundChange = true
+
+		logger.Debug("MY:istanbul.core.startNewRound (roundChange=true)")
 	} else {
 		logger.Warn("New sequence should be larger than current sequence", "new_seq", lastProposal.Number().Int64())
 		return
@@ -241,7 +243,7 @@ func (c *core) startNewRound(round *big.Int) {
 		}
 	} else {
 		newView = &istanbul.View{
-			Sequence: new(big.Int).Add(lastProposal.Number(), common.Big1), // переходим ко новой последовательности
+			Sequence: new(big.Int).Add(lastProposal.Number(), common.Big1), // переходим к новой последовательности !(OR JUST LEAVE OLD)!
 			Round:    new(big.Int), // и раунды начинаются с нуля
 		}
 		c.valSet = c.backend.Validators(lastProposal)
@@ -260,6 +262,7 @@ func (c *core) startNewRound(round *big.Int) {
 	c.valSet.CalcProposer(lastProposer, newView.Round.Uint64())
 	c.waitingForRoundChange = false
 	c.setState(StateAcceptRequest)
+
 	if roundChange && c.IsProposer() && c.current != nil {
 		// If it is locked, propose the old proposal
 		// If we have pending request, propose pending request
@@ -274,11 +277,13 @@ func (c *core) startNewRound(round *big.Int) {
 	}
 	c.newRoundChangeTimer()
 
-	logger.Debug("New round", "new_round", newView.Round, "new_seq", newView.Sequence, "new_proposer", c.valSet.GetProposer(), "valSet", c.valSet.List(), "size", c.valSet.Size(), "IsProposer", c.IsProposer())
+	logger.Debug("MY:<-istanbul.core.startNewRound", "new_round", newView.Round, "new_seq", newView.Sequence, "new_proposer", c.valSet.GetProposer(), "valSet", c.valSet.List(), "size", c.valSet.Size(), "IsProposer", c.IsProposer())
 }
 
 func (c *core) catchUpRound(view *istanbul.View) {
 	logger := c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.valSet.GetProposer())
+
+	logger.Trace("MY:istanbul.core.catchUpRound->", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.valSet)
 
 	if view.Round.Cmp(c.current.Round()) > 0 {
 		c.roundMeter.Mark(new(big.Int).Sub(view.Round, c.current.Round()).Int64())
@@ -290,7 +295,7 @@ func (c *core) catchUpRound(view *istanbul.View) {
 	c.roundChangeSet.Clear(view.Round)
 	c.newRoundChangeTimer()
 
-	logger.Trace("Catch up round", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.valSet)
+	logger.Trace("MY:<-istanbul.core.catchUpRound", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.valSet)
 }
 
 // updateRoundState updates round state by checking if locking block is necessary
@@ -335,7 +340,7 @@ func (c *core) stopTimer() {
 }
 
 func (c *core) newRoundChangeTimer() {
-	logger := c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.valSet.GetProposer())
+	logger := c.logger.New("round", c.current.Round(), "seq", c.current.Sequence(), "proposer", c.valSet.GetProposer())
 
 	logger.Debug("MY: istanbul.core.newRoundChangeTimer")
 	c.stopTimer() // надо сбросить таймер, когда начинается не только новый раунд, но и новая последовательность (новый блок)
