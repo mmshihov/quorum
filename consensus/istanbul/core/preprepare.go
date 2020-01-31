@@ -66,6 +66,7 @@ func (c *core) handlePreprepare(msg *message, src istanbul.Validator) error {
 			valSet := c.backend.ParentValidators(preprepare.Proposal).Copy()
 			previousProposer := c.backend.GetProposer(preprepare.Proposal.Number().Uint64() - 1)
 			valSet.CalcProposer(previousProposer, preprepare.View.Round.Uint64())
+
 			// Broadcast COMMIT if it is an existing block
 			// 1. The proposer needs to be a proposer matches the given (Sequence + Round)
 			// 2. The given block must exist

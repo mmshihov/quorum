@@ -101,11 +101,16 @@ func (c *core) handleRoundChange(msg *message, src istanbul.Validator) error {
 	if c.waitingForRoundChange && num == int(c.valSet.F()+1) {
 		if cv.Round.Cmp(roundView.Round) < 0 {
 			c.sendRoundChange(roundView.Round)
+			// TODO: THIS IS THE PROBLEM!!! NO START_NEW_ROUND IN CASE OF 3 VALIDATORS!
+			// SHOULD CATCHUP-ROUND RECALCULATE THE PROPOSER?
+		} else if (cv.Round.Cmp(roundView.Round) == 0) && (num == 1) {
+			c.startNewRound(roundView.Round) //MY: FIX
 		}
 		return nil
 	} else if num == c.QuorumSize() && (c.waitingForRoundChange || cv.Round.Cmp(roundView.Round) < 0) {
 		// We've received 2f+1/Ceil(2N/3) ROUND CHANGE messages, start a new round immediately.
 		c.startNewRound(roundView.Round) // TODO: начинаем новый раунд в ответ на получение
+			//TODO: FOR CASE OF 3 VALIDATORS IT IS NOT WORKING
 		return nil
 	} else if cv.Round.Cmp(roundView.Round) < 0 {
 		// Only gossip the message with current round to other validators.

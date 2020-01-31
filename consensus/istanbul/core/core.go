@@ -162,6 +162,8 @@ func (c *core) IsProposer() bool {
 	if v == nil {
 		return false
 	}
+	// MY: HOW IT POSSIBLE TO ANSWER IS PROPOSER OR NOT???
+	// IT SHOULD BE USED ROUND AND SEQUENCE INFO FROM ROUND STATE?
 	return v.IsProposer(c.backend.Address())
 }
 
@@ -250,7 +252,7 @@ func (c *core) startNewRound(round *big.Int) {
 	}
 
 	// Update logger
-	logger = logger.New("old_proposer", c.valSet.GetProposer())
+	logger = logger.New("old_proposer", c.valSet.GetProposer(), "LAST_PROPOSER", lastProposer)
 
 	// Clear invalid ROUND CHANGE messages
 	c.roundChangeSet = newRoundChangeSet(c.valSet)
@@ -283,19 +285,20 @@ func (c *core) startNewRound(round *big.Int) {
 func (c *core) catchUpRound(view *istanbul.View) {
 	logger := c.logger.New("old_round", c.current.Round(), "old_seq", c.current.Sequence(), "old_proposer", c.valSet.GetProposer())
 
-	logger.Trace("MY:istanbul.core.catchUpRound->", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.valSet)
+	logger.Debug("MY:istanbul.core.catchUpRound->", "new_round", view.Round, "new_seq", view.Sequence)
 
 	if view.Round.Cmp(c.current.Round()) > 0 {
 		c.roundMeter.Mark(new(big.Int).Sub(view.Round, c.current.Round()).Int64())
 	}
 	c.waitingForRoundChange = true // TODO: ожидание смены раунда
+								   // SHOULD WE FIX PROPOSER???
 
 	// Need to keep block locked for round catching up
 	c.updateRoundState(view, c.valSet, true)
 	c.roundChangeSet.Clear(view.Round)
 	c.newRoundChangeTimer()
 
-	logger.Trace("MY:<-istanbul.core.catchUpRound", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.valSet)
+	logger.Trace("MY:<-istanbul.core.catchUpRound", "new_round", view.Round, "new_seq", view.Sequence, "new_proposer", c.valSet.GetProposer())
 }
 
 // updateRoundState updates round state by checking if locking block is necessary
