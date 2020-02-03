@@ -316,8 +316,8 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		timestamp   int64      // timestamp for each round of mining.
 	)
 
-	//timer := time.NewTimer(0)
-	//<-timer.C // discard the initial tick
+	timer := time.NewTimer(0)
+	<-timer.C // discard the initial tick
 
 	// commit aborts in-flight transaction execution with given signal and resubmits a new one.
 	commit := func(noempty bool, s int32) {
@@ -327,8 +327,6 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		interrupt = new(int32) // and alloc new memory for this work
 
 		w.newWorkCh <- &newWorkReq{interrupt: interrupt, noempty: noempty, timestamp: timestamp}
-
-		//timer.Reset(recommit) // эту штуку нельзя делать тут, так как таймер должен сработать к моменту reset
 
 		atomic.StoreInt32(&w.newTxs, 0) // no new tx!!!
 	}
@@ -382,20 +380,22 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			timestamp = time.Now().Unix()
 			commit(true, commitInterruptNewHead)
 
-//		case <-timer.C:
-//			// If mining is running resubmit a new work cycle periodically to pull in
-//			// higher priced transactions. Disable this overhead for pending blocks.
-//			log.Debug("MY: newWorkLoop got timer.C")
-//			if w.isRunning() && (w.config.Clique == nil || w.config.Clique.Period > 0) {
-//				// Short circuit if no new transaction arrives.
-//				if atomic.LoadInt32(&w.newTxs) == 0 {
-//					timer.Reset(recommit)
-//					log.Debug("MY: newWorkLoop got timer.C but no new TX, so no work to commit")
-//					continue
-//				}
-//				log.Debug("MY: newWorkLoop got timer.C and do commit(true, intResubmit)")
-//				commit(true, commitInterruptResubmit) // this shit do timer.Reset(...)
-//			}
+		case <-timer.C:
+			// If mining is running resubmit a new work cycle periodically to pull in
+			// higher priced transactions. Disable this overhead for pending blocks.
+			log.Debug("MY: newWorkLoop got timer.C")
+			if w.isRunning() && (w.config.Clique == nil || w.config.Clique.Period > 0) {
+				// Short circuit if no new transaction arrives.
+				if atomic.LoadInt32(&w.newTxs) == 0 {
+					timer.Reset(recommit)
+					log.Debug("MY: newWorkLoop got timer.C but no new TX, so no work to commit")
+					continue
+				}
+				log.Debug("MY: newWorkLoop got timer.C and do commit(true, intResubmit)")
+
+				timer.Reset(recommit) // эту штуку нельзя делать тут, так как таймер должен сработать к моменту reset
+				commit(true, commitInterruptResubmit) // this shit do timer.Reset(...)
+			}
 
 		case interval := <-w.resubmitIntervalCh:
 			log.Debug("MY: newWorkLoop got w.resubmitIntervalCh")
@@ -1017,11 +1017,11 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	commitUncles(w.localUncles)
 	commitUncles(w.remoteUncles)
 
-	if !noempty {
-		// Create an empty block based on temporary copied state for sealing in advance without waiting block
-		// execution finished.
-		w.commit(uncles, nil, false, tstart)
-	}
+//	if !noempty {
+//		// Create an empty block based on temporary copied state for sealing in advance without waiting block
+//		// execution finished.
+//		w.commit(uncles, nil, false, tstart)
+//	}
 
 	// Fill the block with all available pending transactions.
 	pending, err := w.eth.TxPool().Pending()
@@ -1080,6 +1080,8 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 
 	s := w.current.state.Copy()
 	ps := w.current.privateState.Copy()
+
+	//TODO here --- not create block if no transactions
 	block, err := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, uncles, w.current.receipts)
 	if err != nil {
 		log.Debug("MY: commit(){ ... bad block finalisation ...}")
