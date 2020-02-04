@@ -96,6 +96,8 @@ func (c *core) handleRoundChange(msg *message, src istanbul.Validator) error {
 	if c.waitingForRoundChange && num == int(c.valSet.F()+1) {
 		if cv.Round.Cmp(roundView.Round) < 0 {
 			c.sendRoundChange(roundView.Round)
+		} else if (cv.Round.Cmp(roundView.Round) == 0) && (num == 1) {
+			c.startNewRound(roundView.Round)
 		}
 		return nil
 	} else if num == c.QuorumSize() && (c.waitingForRoundChange || cv.Round.Cmp(roundView.Round) < 0) {
